@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no,viewport-fit=cover">
+<title>Stair Climbing Wheelchair</title>
+<style>
+:root{
+  color-scheme:dark;
+  --bg:#141a22; --surface:#1e2631; --line:#2f3947;
+  --text:#f2f5f8; --muted:#9aa7b6;
+  --blue:#4aa3ff; --green:#3ddc97; --amber:#ffb454; --red:#ff6b6b;
+  --s:clamp(70px,24vmin,120px);           /* cube size */
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;background:var(--bg);color:var(--text);
+  font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans Thai",sans-serif;
+  user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent;
+  display:flex;flex-direction:column;
+  height:100dvh;overflow:hidden;
+  padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+/* ---------- top bar ---------- */
+header{display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid var(--line)}
+header h1{font-size:16px;font-weight:600;margin:0;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#status{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--muted)}
+#dot{width:10px;height:10px;border-radius:50%;background:var(--muted)}
+#dot.on{background:var(--green)} #dot.err{background:var(--red)}
+button{
+  font:inherit;font-size:16px;font-weight:600;border:0;border-radius:12px;
+  padding:12px 18px;background:var(--blue);color:#06121f;cursor:pointer;
+}
+button:active{filter:brightness(.85)}
+button:focus-visible{outline:3px solid #fff;outline-offset:2px}
+button.ghost{background:var(--surface);color:var(--text);border:1px solid var(--line)}
+
+/* ---------- main: controller left, 3D right ---------- */
+main{flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:16px}
+
+.left{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:0;gap:10px}
+#pad{
+  height:100%;max-width:100%;aspect-ratio:1;max-height:100%;
+  border-radius:50%;background:var(--surface);border:2px solid var(--line);
+  position:relative;touch-action:none;
+}
+#pad::before,#pad::after{content:"";position:absolute;background:var(--line)}
+#pad::before{left:50%;top:12%;bottom:12%;width:1px}
+#pad::after{top:50%;left:12%;right:12%;height:1px}
+#knob{
+  width:36%;height:36%;border-radius:50%;background:var(--blue);
+  position:absolute;left:32%;top:32%;
+  box-shadow:0 4px 14px #0009;
+}
+.hint{font-size:13px;color:var(--muted);margin:0;text-align:center}
+
+.right{display:flex;flex-direction:column;gap:12px;min-height:0}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:12px}
+#view{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;perspective:700px;overflow:hidden}
+#cube{
+  position:relative;width:var(--s);height:var(--s);
+  transform-style:preserve-3d;transform:rotateX(-20deg) rotateY(-25deg);
+  transition:transform .08s linear;
+}
+.face{
+  position:absolute;width:var(--s);height:var(--s);
+  border:2px solid #fff8;display:flex;align-items:center;justify-content:center;
+  font-weight:700;font-size:13px;backface-visibility:hidden;
+}
+.front{background:#168aadcc;transform:translateZ(calc(var(--s)/2))}
+.back{background:#d1495bcc;transform:rotateY(180deg) translateZ(calc(var(--s)/2))}
+.right-f{background:#edae49dd;transform:rotateY(90deg) translateZ(calc(var(--s)/2))}
+.left-f{background:#5b8e7dcc;transform:rotateY(-90deg) translateZ(calc(var(--s)/2))}
+.top{background:#8e6cbdcc;transform:rotateX(90deg) translateZ(calc(var(--s)/2))}
+.bottom{background:#555e;transform:rotateX(-90deg) translateZ(calc(var(--s)/2))}
+
+.readings{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center}
+.reading small{display:block;font-size:12px;color:var(--muted)}
+.reading span{font-size:20px;font-weight:600;font-variant-numeric:tabular-nums}
+
+.mode{display:flex;align-items:center;gap:12px}
+.mode .name{flex:1}
+.mode small{display:block;font-size:12px;color:var(--muted)}
+#mode{font-size:20px;font-weight:700;color:var(--green)}
+#mode.climb{color:var(--amber)}
+
+/* ---------- portrait phone: stack and ask to rotate ---------- */
+@media (orientation:portrait){
+  body{overflow:auto;height:auto;min-height:100dvh}
+  main{grid-template-columns:1fr}
+  #pad{width:min(80vw,320px);height:auto}
+  #view{min-height:200px}
+  .rotate{display:block}
+}
+.rotate{display:none;text-align:center;font-size:13px;color:var(--amber);padding:8px 16px 0}
+@media (prefers-reduced-motion:reduce){#cube{transition:none}}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Stair Climbing Wheelchair</h1>
+  <div id="status"><span id="dot"></span><span id="st">Not connected</span></div>
+  <button id="conn">Connect</button>
+</header>
+<div class="rotate">Rotate your phone to landscape for easier control</div>
+
+<main>
+  <!-- LEFT: joystick -->
+  <section class="left">
+    <div id="pad"><div id="knob"></div></div>
+    <p class="hint">Push the joystick to move. Release to stop.</p>
+  </section>
+
+  <!-- RIGHT: 3D + readings + mode -->
+  <section class="right">
+    <div class="card" id="view">
+      <div id="cube">
+        <div class="face front">Front</div><div class="face back">Back</div>
+        <div class="face right-f">Right</div><div class="face left-f">Left</div>
+        <div class="face top">Top</div><div class="face bottom">Bottom</div>
+      </div>
+    </div>
+    <div class="card readings">
+      <div class="reading"><small>Heading</small><span id="heading">--°</span></div>
+      <div class="reading"><small>Roll</small><span id="roll">--°</span></div>
+      <div class="reading"><small>Pitch</small><span id="pitch">--°</span></div>
+    </div>
+    <div class="card mode">
+      <div class="name"><small>Current mode</small><div id="mode">Drive</div></div>
+      <button id="b" class="ghost">Switch mode</button>
+    </div>
+  </section>
+</main>
+
+<script>
+const SERVICE='6e400001-b5a3-f393-e0a9-e50e24dcca9e';
+const RX='6e400002-b5a3-f393-e0a9-e50e24dcca9e';
+const TX='6e400003-b5a3-f393-e0a9-e50e24dcca9e';
+const enc=new TextEncoder(),dec=new TextDecoder();
+const $=id=>document.getElementById(id);
+const st=$('st'),dot=$('dot'),cube=$('cube'),modeEl=$('mode');
+let rx=null,busy=false;
+
+function setStatus(text,state){st.textContent=text;dot.className=state||'';}
+
+async function connect(){
+ try{
+  if(!navigator.bluetooth)throw new Error('Bluetooth is not supported in this browser (use Chrome on Android)');
+  const dev=await navigator.bluetooth.requestDevice({filters:[{services:[SERVICE]}]});
+  dev.addEventListener('gattserverdisconnected',()=>{rx=null;setStatus('Disconnected','err');$('conn').textContent='Reconnect';});
+  setStatus('Connecting…');
+  const server=await dev.gatt.connect(),svc=await server.getPrimaryService(SERVICE);
+  rx=await svc.getCharacteristic(RX);const tx=await svc.getCharacteristic(TX);
+  await tx.startNotifications();
+  tx.addEventListener('characteristicvaluechanged',e=>{
+   const msg=dec.decode(e.target.value).trim();
+   if(msg.startsWith('IMU,')){
+    const v=msg.split(',');
+    if(v.length>=4){
+     const heading=Number(v[1]),roll=Number(v[2]),pitch=Number(v[3]);
+     if([heading,roll,pitch].every(Number.isFinite)){
+      $('heading').textContent=heading.toFixed(0)+'°';
+      $('roll').textContent=roll.toFixed(0)+'°';
+      $('pitch').textContent=pitch.toFixed(0)+'°';
+      cube.style.transform=`rotateX(${pitch}deg) rotateY(${heading}deg) rotateZ(${roll}deg)`;
+     }
+    }
+   }else if(msg==='DRIVE'||msg==='CLIMB'){
+    modeEl.textContent=msg==='CLIMB'?'Climb':'Drive';
+    modeEl.classList.toggle('climb',msg==='CLIMB');
+   }
+  });
+  setStatus('Connected','on');$('conn').textContent='Connected';
+  keepAwake();
+ }catch(err){
+  if(err.name==='NotFoundError')setStatus('No device selected');
+  else setStatus('Connection failed: '+err.message,'err');
+ }
+}
+
+// keep the screen on while driving (ignored if unsupported)
+async function keepAwake(){try{if(navigator.wakeLock)await navigator.wakeLock.request('screen');}catch(e){}}
+
+async function send(text){if(!rx||busy)return;busy=true;try{await rx.writeValueWithoutResponse(enc.encode(text));}catch(e){}busy=false;}
+$('conn').onclick=connect;
+$('b').onclick=()=>send('M\n');
+
+/* ---------- joystick ---------- */
+const pad=$('pad'),knob=$('knob');
+let x=0,y=0,active=false;
+function move(e){
+ const r=pad.getBoundingClientRect(),R=r.width/2,k=knob.offsetWidth/2;
+ let dx=(e.clientX-(r.left+R))/R,dy=(e.clientY-(r.top+R))/R;
+ const d=Math.hypot(dx,dy);if(d>1){dx/=d;dy/=d;}
+ x=dx;y=-dy;
+ knob.style.left=(R+dx*(R-k)-k)+'px';knob.style.top=(R+dy*(R-k)-k)+'px';
+}
+function resetKnob(){knob.style.left='32%';knob.style.top='32%';}
+pad.addEventListener('pointerdown',e=>{active=true;pad.setPointerCapture(e.pointerId);move(e);});
+pad.addEventListener('pointermove',e=>{if(active)move(e);});
+function release(){active=false;x=0;y=0;resetKnob();busy=false;send('J,0.00,0.00\n');}
+pad.addEventListener('pointerup',release);
+pad.addEventListener('pointercancel',release);
+setInterval(()=>{if(active)send('J,'+x.toFixed(2)+','+y.toFixed(2)+'\n');},60);
+
+// safety: if the page is hidden while holding the joystick, stop
+document.addEventListener('visibilitychange',()=>{if(document.hidden&&active)release();});
+</script>
+</body>
+</html>
