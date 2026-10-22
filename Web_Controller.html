@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no,viewport-fit=cover">
+<title>Stair Climbing Wheelchair</title>
+<style>
+:root{
+  color-scheme:light;
+  --white:#ffffff; --bg:#ffffff; --tint:#fdf0f5; --line:#f3c9db;
+  --text:#3a0d24; --muted:#8a5a72;
+  --pink:#c2185b; --pink-dark:#880e4f; --pink-mid:#e0306f; --pink-light:#f48fb1;
+  --green:#12905a; --amber:#d17a00; --red:#d32f2f;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;background:var(--bg);color:var(--text);
+  font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans Thai",sans-serif;
+  user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent;
+  display:flex;flex-direction:column;
+  height:100dvh;overflow:hidden;
+  padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+/* ---------- top bar: solid deep pink ---------- */
+header{display:flex;align-items:center;gap:12px;padding:10px 16px;background:var(--pink);color:#fff}
+#logo{height:38px;width:auto;flex:none;display:block}
+header h1{font-size:18px;font-weight:800;letter-spacing:.3px;margin:0;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#status{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600}
+#dot{width:12px;height:12px;border-radius:50%;background:var(--pink-light);border:2px solid #fff}
+#dot.on{background:#3ddc84} #dot.err{background:#ff5252}
+button{
+  font:inherit;font-size:18px;font-weight:700;border:0;border-radius:14px;
+  min-height:52px;padding:12px 22px;cursor:pointer;
+  background:var(--pink);color:#fff;box-shadow:0 4px 0 var(--pink-dark);
+}
+button:active{transform:translateY(3px);box-shadow:0 1px 0 var(--pink-dark)}
+button:focus-visible{outline:3px solid var(--text);outline-offset:2px}
+header button{background:#fff;color:var(--pink);box-shadow:0 4px 0 var(--pink-dark)}
+
+/* ---------- main: controller left, info right ---------- */
+main{flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:16px}
+
+.left{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:0;gap:10px}
+#pad{
+  height:100%;max-width:100%;aspect-ratio:1;max-height:100%;
+  border-radius:50%;position:relative;touch-action:none;
+  background:var(--tint);border:6px solid var(--pink);
+}
+#pad::before,#pad::after{content:"";position:absolute;background:var(--line);border-radius:2px}
+#pad::before{left:50%;top:10%;bottom:10%;width:3px;margin-left:-1.5px}
+#pad::after{top:50%;left:10%;right:10%;height:3px;margin-top:-1.5px}
+.ring{position:absolute;inset:22%;border-radius:50%;border:3px solid var(--line);pointer-events:none}
+#knob{
+  width:36%;height:36%;border-radius:50%;position:absolute;left:32%;top:32%;z-index:1;
+  background:var(--pink);border:5px solid #fff;
+  box-shadow:0 0 0 3px var(--pink),0 8px 16px rgba(136,14,79,.4);
+}
+.hint{font-size:13px;color:var(--muted);margin:0;text-align:center}
+
+.right{display:flex;flex-direction:column;gap:12px;min-height:0}
+.card{background:var(--white);border:2px solid var(--line);border-radius:20px;padding:14px}
+.card small{display:block;font-size:12px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--muted)}
+
+/* seat angle */
+.seat{flex:1;min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;border-color:var(--pink)}
+#gauge{flex:1 1 0;min-height:0;width:100%;max-width:380px}
+#tilt{transform-origin:100px 118px;transition:transform .1s linear}
+#angle{font-size:36px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums;color:var(--muted)}
+#angle.ok{color:var(--green)} #angle.warn{color:var(--amber)} #angle.bad{color:var(--red)}
+#dir{font-size:14px;color:var(--muted)}
+
+/* mode card: solid deep pink block */
+.mode{display:flex;align-items:center;gap:12px;background:var(--pink);border-color:var(--pink);color:#fff}
+.mode small{color:#fbd0e1}
+.mode > div:first-child{min-width:78px}
+#mode{font-size:24px;font-weight:800;color:#fff}
+.mode .btns{display:flex;gap:10px;flex:1}
+.mode .btns button{
+  flex:1;min-height:58px;font-size:16px;padding:10px 8px;
+  background:#fff;color:var(--pink);box-shadow:0 4px 0 var(--pink-dark);
+}
+
+/* ---------- portrait phone: stack and ask to rotate ---------- */
+@media (orientation:portrait){
+  body{overflow:auto;height:auto;min-height:100dvh}
+  main{grid-template-columns:1fr}
+  #pad{width:min(80vw,320px);height:auto}
+  .seat{min-height:190px}
+  .mode{flex-wrap:wrap}
+  .rotate{display:block}
+}
+.rotate{display:none;text-align:center;font-size:13px;font-weight:600;color:var(--pink);background:var(--tint);padding:8px 16px}
+@media (prefers-reduced-motion:reduce){#tilt{transition:none}button:active{transform:none}}
+</style>
+</head>
+<body>
+
+<header>
+  <img id="logo" src="data:image/png;base64,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" alt="Autak - Inclusion by Innovation">
+  <h1>Stair Climbing Wheelchair</h1>
+  <div id="status"><span id="dot"></span><span id="st">Not connected</span></div>
+  <button id="conn">Connect</button>
+</header>
+<div class="rotate">Rotate your phone to landscape for easier control</div>
+
+<main>
+  <!-- LEFT: joystick -->
+  <section class="left">
+    <div id="pad"><div class="ring"></div><div id="knob"></div></div>
+    <p class="hint">Push the joystick to move. Release to stop.</p>
+  </section>
+
+  <!-- RIGHT: seat angle + mode -->
+  <section class="right">
+    <div class="card seat">
+      <small>Seat angle (front / back)</small>
+      <svg id="gauge" viewBox="14 26 172 112" role="img" aria-label="Seat angle, side view">
+        <!-- level reference -->
+        <line x1="20" y1="118" x2="180" y2="118" stroke="#f48fb1" stroke-width="2" stroke-dasharray="5 5"/>
+        <!-- seat, side view. Front of the chair is on the right. -->
+        <g id="tilt">
+          <rect x="62" y="108" width="76" height="10" rx="4" fill="#c2185b"/>      <!-- cushion -->
+          <rect x="62" y="40" width="10" height="72" rx="4" fill="#c2185b"/>       <!-- backrest -->
+          <rect x="130" y="112" width="26" height="6" rx="3" fill="#f48fb1"/>      <!-- front edge marker -->
+        </g>
+        <circle cx="100" cy="118" r="4" fill="#3a0d24"/>
+        <text x="22" y="134" fill="#8a5a72" font-size="11">Back</text>
+        <text x="178" y="134" fill="#8a5a72" font-size="11" text-anchor="end">Front</text>
+      </svg>
+      <div id="angle">--°</div>
+      <div id="dir">Waiting for sensor</div>
+    </div>
+
+    <div class="card mode">
+      <div><small>Mode</small><div id="mode">Drive</div></div>
+      <div class="btns">
+        <button id="z">Set level</button>
+        <button id="b">Switch mode</button>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+const SERVICE='6e400001-b5a3-f393-e0a9-e50e24dcca9e';
+const RX='6e400002-b5a3-f393-e0a9-e50e24dcca9e';
+const TX='6e400003-b5a3-f393-e0a9-e50e24dcca9e';
+const enc=new TextEncoder(),dec=new TextDecoder();
+const $=id=>document.getElementById(id);
+const st=$('st'),dot=$('dot'),modeEl=$('mode');
+const tilt=$('tilt'),angleEl=$('angle'),dirEl=$('dir');
+let rx=null,busy=false;
+
+function setStatus(text,state){st.textContent=text;dot.className=state||'';}
+
+// angle > 0 = seat tilted back, angle < 0 = tilted forward
+function showSeat(a){
+  const mag=Math.abs(a);
+  tilt.style.transform='rotate('+(-a)+'deg)';   // tilted back lifts the front edge
+  angleEl.textContent=mag.toFixed(1)+'°';
+  angleEl.className=mag<=2?'ok':(mag<=8?'warn':'bad');
+  dirEl.textContent=mag<1?'Level':(a>0?'Tilted back':'Tilted forward');
+}
+
+async function connect(){
+ try{
+  if(!navigator.bluetooth)throw new Error('Bluetooth is not supported in this browser (use Chrome on Android)');
+  const dev=await navigator.bluetooth.requestDevice({filters:[{services:[SERVICE]}]});
+  dev.addEventListener('gattserverdisconnected',()=>{rx=null;setStatus('Disconnected','err');$('conn').textContent='Reconnect';});
+  setStatus('Connecting…');
+  const server=await dev.gatt.connect(),svc=await server.getPrimaryService(SERVICE);
+  rx=await svc.getCharacteristic(RX);const tx=await svc.getCharacteristic(TX);
+  await tx.startNotifications();
+  tx.addEventListener('characteristicvaluechanged',e=>{
+   const msg=dec.decode(e.target.value).trim();
+   if(msg.startsWith('SEAT,')){
+    const a=Number(msg.split(',')[1]);
+    if(Number.isFinite(a))showSeat(a);
+   }else if(msg==='DRIVE'||msg==='CLIMB'){
+    modeEl.textContent=msg==='CLIMB'?'Climb':'Drive';
+   }
+  });
+  setStatus('Connected','on');$('conn').textContent='Connected';
+  keepAwake();
+ }catch(err){
+  if(err.name==='NotFoundError')setStatus('No device selected');
+  else setStatus('Connection failed: '+err.message,'err');
+ }
+}
+
+// keep the screen on while driving (ignored if unsupported)
+async function keepAwake(){try{if(navigator.wakeLock)await navigator.wakeLock.request('screen');}catch(e){}}
+
+async function send(text){if(!rx||busy)return;busy=true;try{await rx.writeValueWithoutResponse(enc.encode(text));}catch(e){}busy=false;}
+$('conn').onclick=connect;
+$('b').onclick=()=>send('M\n');
+$('z').onclick=()=>{
+  if(confirm('Is the chassis on level ground and the seat level right now? This saves the current position as 0°.'))send('Z\n');
+};
+
+/* ---------- joystick ---------- */
+const pad=$('pad'),knob=$('knob');
+let x=0,y=0,active=false;
+function move(e){
+ const r=pad.getBoundingClientRect(),R=r.width/2,k=knob.offsetWidth/2;
+ let dx=(e.clientX-(r.left+R))/R,dy=(e.clientY-(r.top+R))/R;
+ const d=Math.hypot(dx,dy);if(d>1){dx/=d;dy/=d;}
+ x=dx;y=-dy;
+ knob.style.left=(R+dx*(R-k)-k)+'px';knob.style.top=(R+dy*(R-k)-k)+'px';
+}
+function resetKnob(){knob.style.left='32%';knob.style.top='32%';}
+pad.addEventListener('pointerdown',e=>{active=true;pad.setPointerCapture(e.pointerId);move(e);});
+pad.addEventListener('pointermove',e=>{if(active)move(e);});
+function release(){active=false;x=0;y=0;resetKnob();busy=false;send('J,0.00,0.00\n');}
+pad.addEventListener('pointerup',release);
+pad.addEventListener('pointercancel',release);
+setInterval(()=>{if(active)send('J,'+x.toFixed(2)+','+y.toFixed(2)+'\n');},60);
+
+// safety: if the page is hidden while holding the joystick, stop
+document.addEventListener('visibilitychange',()=>{if(document.hidden&&active)release();});
+</script>
+</body>
+</html>
